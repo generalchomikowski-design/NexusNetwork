@@ -51,7 +51,7 @@ export default function Hero() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1 }}
-              className="font-display font-black text-5xl sm:text-7xl lg:text-8xl xl:text-9xl leading-[0.9] tracking-tighter"
+              className="font-display font-black text-5xl sm:text-7xl lg:text-7xl xl:text-8xl leading-[0.9] tracking-tighter"
               data-testid="hero-title"
             >
               <span className="block text-white nx-glitch-hover">NEXUS</span>

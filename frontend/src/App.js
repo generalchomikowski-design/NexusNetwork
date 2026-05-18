@@ -21,7 +21,7 @@ function App() {
         </Routes>
       </BrowserRouter>
       <Toaster
-        position="top-right"
+        position="bottom-right"
         toastOptions={{
           style: {
             background: "#1F003D",

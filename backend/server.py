@@ -360,37 +360,44 @@ async def checkout_status(session_id: str, request: Request):
     webhook_url = f"{host_url}/api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
 
+    # Try to fetch latest status from Stripe; fall back to DB state on any
+    # Stripe API hiccup (e.g. session not yet propagated through proxy).
     try:
         status_resp: CheckoutStatusResponse = await stripe_checkout.get_checkout_status(session_id)
-    except Exception as e:
-        logging.exception("Failed to get checkout status")
-        raise HTTPException(status_code=500, detail=f"Błąd Stripe: {str(e)}")
+        already_paid = txn.get("payment_status") == "paid"
+        new_status = status_resp.status
+        new_payment_status = status_resp.payment_status
 
-    # Avoid double-processing on already-paid
-    already_paid = txn.get("payment_status") == "paid"
-    new_status = status_resp.status
-    new_payment_status = status_resp.payment_status
+        if not already_paid:
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "status": new_status,
+                    "payment_status": new_payment_status,
+                    "amount_total_cents": status_resp.amount_total,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            )
 
-    if not already_paid:
-        await db.payment_transactions.update_one(
-            {"session_id": session_id},
-            {"$set": {
-                "status": new_status,
-                "payment_status": new_payment_status,
-                "amount_total_cents": status_resp.amount_total,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
+        amount_total = status_resp.amount_total / 100 if status_resp.amount_total else float(txn.get("amount", 0))
+        return CheckoutStatusOut(
+            session_id=session_id,
+            status=new_status,
+            payment_status=new_payment_status,
+            amount_total=amount_total,
+            currency=status_resp.currency or txn.get("currency", "pln"),
+            package_name=txn.get("package_name"),
         )
-
-    amount_total = status_resp.amount_total / 100 if status_resp.amount_total else float(txn.get("amount", 0))
-    return CheckoutStatusOut(
-        session_id=session_id,
-        status=new_status,
-        payment_status=new_payment_status,
-        amount_total=amount_total,
-        currency=status_resp.currency or txn.get("currency", "pln"),
-        package_name=txn.get("package_name"),
-    )
+    except Exception as e:
+        logging.warning(f"Stripe status fetch failed for {session_id}: {e}; falling back to DB state")
+        return CheckoutStatusOut(
+            session_id=session_id,
+            status=txn.get("status", "initiated"),
+            payment_status=txn.get("payment_status", "pending"),
+            amount_total=float(txn.get("amount", 0)),
+            currency=txn.get("currency", "pln"),
+            package_name=txn.get("package_name"),
+        )
 
 
 @api_router.post("/webhook/stripe")
