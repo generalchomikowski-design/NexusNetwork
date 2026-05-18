@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map, MessageSquare, Ticket, ArrowUpRight } from "lucide-react";
+import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map, MessageSquare, Ticket, ArrowUpRight, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -32,6 +32,7 @@ export default function Packages() {
   const [activeTab, setActiveTab] = useState("hosting");
   const [selected, setSelected] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api
@@ -49,6 +50,27 @@ export default function Packages() {
   const onBuyClick = (pkg) => {
     setSelected(pkg);
     setDialogOpen(true);
+  };
+
+  const handleStripeCheckout = async () => {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      const res = await api.post("/checkout/create", {
+        package_id: selected.id,
+        origin_url: window.location.origin,
+      });
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      } else {
+        toast.error("Brak adresu Stripe");
+      }
+    } catch (e) {
+      const msg = e.response?.data?.detail || "Błąd płatności";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -85,9 +107,10 @@ export default function Packages() {
             className="mt-5 text-base sm:text-lg text-[#A68CC2] max-w-2xl mx-auto"
           >
             Promocja <span className="text-white font-bold">-50%</span> na pakiety
-            Basic, Normal i Pro. Aby zamówić pakiet,{" "}
+            Basic, Normal i Pro. Zapłać kartą przez{" "}
+            <span className="text-white font-semibold">Stripe</span> lub{" "}
             <span className="text-white font-semibold">stwórz ticketa</span> na
-            naszym Discordzie.
+            Discordzie.
           </motion.p>
         </div>
 
@@ -138,66 +161,103 @@ export default function Packages() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-[#150029] border-[#B026FF]/30 text-white sm:max-w-md"
+          className="bg-[#150029] border-[#B026FF]/30 text-white sm:max-w-lg"
           data-testid="buy-dialog"
         >
           <DialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="inline-flex w-11 h-11 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center">
-                <Ticket className="w-5 h-5 text-[#FF1E56]" />
-              </span>
-              <DialogTitle className="font-display text-2xl">
-                Stwórz ticketa
-              </DialogTitle>
-            </div>
+            <DialogTitle className="font-display text-2xl">
+              {selected ? `Zamówienie: ${selected.name}` : "Zamówienie"}
+            </DialogTitle>
             <DialogDescription className="text-[#A68CC2] leading-relaxed pt-2">
               {selected ? (
                 <>
-                  Aby zamówić pakiet{" "}
-                  <span className="text-white font-semibold">{selected.name}</span>
-                  {" "}({formatPLN(selected.price)}), dołącz do naszego serwera
-                  Discord i stwórz ticketa w kanale{" "}
-                  <span className="text-white font-semibold">#ticket</span>.
-                  Nasz zespół odpowie w ciągu kilku minut i poprowadzi Cię przez
-                  zamówienie krok po kroku.
+                  Kwota:{" "}
+                  <span className="text-white font-bold">
+                    {formatPLN(selected.price)}
+                  </span>
+                  . Wybierz wygodną dla Ciebie metodę płatności.
                 </>
               ) : (
-                <>
-                  Dołącz do naszego serwera Discord i stwórz ticketa, aby zamówić
-                  wybrany pakiet.
-                </>
+                "Wybierz wygodną dla Ciebie metodę płatności."
               )}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="my-4 nx-card rounded-lg p-4 flex items-center gap-3">
-            <MessageSquare className="w-4 h-4 text-[#FF1E56] flex-shrink-0" />
-            <div className="text-sm">
-              <p className="text-xs uppercase tracking-wider text-[#755D8D]">Discord</p>
-              <p className="font-medium text-white break-all">discord.gg/qBxNmfcMFd</p>
+          {/* Stripe option */}
+          <div className="nx-card rounded-lg p-5 mt-3">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+                <CreditCard className="w-4 h-4 text-[#FF1E56]" />
+              </span>
+              <div>
+                <p className="font-display font-bold text-white">
+                  Zapłać kartą (Stripe)
+                </p>
+                <p className="text-xs text-[#A68CC2] mt-0.5">
+                  Karta, BLIK, Apple Pay, Google Pay. Po opłaceniu skontaktujemy się
+                  z Tobą mailowo w ciągu 24h.
+                </p>
+              </div>
             </div>
+            <button
+              onClick={handleStripeCheckout}
+              disabled={submitting}
+              className="nx-btn-primary w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+              data-testid="buy-dialog-stripe"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Przekierowanie...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-4 h-4" />
+                  Zapłać przez Stripe
+                </>
+              )}
+            </button>
           </div>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => setDialogOpen(false)}
-              className="nx-btn-outline px-5 py-2.5 rounded-md text-sm"
-              data-testid="buy-dialog-cancel"
-            >
-              Anuluj
-            </button>
+          {/* Discord ticket option */}
+          <div className="nx-card rounded-lg p-5 mt-3">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+                <Ticket className="w-4 h-4 text-[#FF1E56]" />
+              </span>
+              <div>
+                <p className="font-display font-bold text-white">
+                  Stwórz ticketa na Discordzie
+                </p>
+                <p className="text-xs text-[#A68CC2] mt-0.5">
+                  Dołącz do serwera i otwórz ticket w kanale{" "}
+                  <span className="text-white font-semibold">#ticket</span>. Nasz
+                  zespół poprowadzi Cię przez zamówienie.
+                </p>
+              </div>
+            </div>
             <a
               href={DISCORD_INVITE}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => setDialogOpen(false)}
-              className="nx-btn-primary px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
-              data-testid="buy-dialog-confirm"
+              className="nx-btn-outline w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
+              data-testid="buy-dialog-ticket"
             >
               <MessageSquare className="w-4 h-4" />
               Przejdź na Discord
               <ArrowUpRight className="w-4 h-4" />
             </a>
+          </div>
+
+          <DialogFooter className="mt-2">
+            <button
+              onClick={() => setDialogOpen(false)}
+              className="text-sm text-[#A68CC2] hover:text-white transition-colors"
+              data-testid="buy-dialog-cancel"
+            >
+              Anuluj
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
