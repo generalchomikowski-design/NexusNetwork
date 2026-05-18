@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map } from "lucide-react";
+import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map, MessageSquare, Ticket, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -16,8 +16,6 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api, formatPLN } from "@/lib/api";
 
 const CATEGORY_LABELS = {
@@ -26,14 +24,14 @@ const CATEGORY_LABELS = {
   maps: { label: "Mapy", icon: Map },
 };
 
+const DISCORD_INVITE = "https://discord.gg/qBxNmfcMFd";
+
 export default function Packages() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("hosting");
   const [selected, setSelected] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ email: "", server_name: "" });
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     api
@@ -50,31 +48,7 @@ export default function Packages() {
 
   const onBuyClick = (pkg) => {
     setSelected(pkg);
-    setForm({ email: "", server_name: "" });
     setDialogOpen(true);
-  };
-
-  const handleCheckout = async () => {
-    if (!selected) return;
-    setSubmitting(true);
-    try {
-      const res = await api.post("/checkout/create", {
-        package_id: selected.id,
-        origin_url: window.location.origin,
-        customer_email: form.email || null,
-        server_name: form.server_name || null,
-      });
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      } else {
-        toast.error("Brak adresu Stripe");
-      }
-    } catch (e) {
-      const msg = e.response?.data?.detail || "Błąd płatności";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   return (
@@ -111,8 +85,9 @@ export default function Packages() {
             className="mt-5 text-base sm:text-lg text-[#A68CC2] max-w-2xl mx-auto"
           >
             Promocja <span className="text-white font-bold">-50%</span> na pakiety
-            Basic, Normal i Pro. Płatność jednorazowa przez Stripe – karta, BLIK,
-            Apple Pay i Google Pay.
+            Basic, Normal i Pro. Aby zamówić pakiet,{" "}
+            <span className="text-white font-semibold">stwórz ticketa</span> na
+            naszym Discordzie.
           </motion.p>
         </div>
 
@@ -163,78 +138,66 @@ export default function Packages() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-[#150029] border-[#B026FF]/30 text-white"
+          className="bg-[#150029] border-[#B026FF]/30 text-white sm:max-w-md"
           data-testid="buy-dialog"
         >
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">
-              Zamów: {selected?.name}
-            </DialogTitle>
-            <DialogDescription className="text-[#A68CC2]">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="inline-flex w-11 h-11 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center">
+                <Ticket className="w-5 h-5 text-[#FF1E56]" />
+              </span>
+              <DialogTitle className="font-display text-2xl">
+                Stwórz ticketa
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-[#A68CC2] leading-relaxed pt-2">
               {selected ? (
                 <>
-                  Kwota:{" "}
-                  <span className="font-bold text-white">
-                    {formatPLN(selected.price)}
-                  </span>{" "}
-                  – płatność jednorazowa przez Stripe.
+                  Aby zamówić pakiet{" "}
+                  <span className="text-white font-semibold">{selected.name}</span>
+                  {" "}({formatPLN(selected.price)}), dołącz do naszego serwera
+                  Discord i stwórz ticketa w kanale{" "}
+                  <span className="text-white font-semibold">#zamówienia</span>.
+                  Nasz zespół odpowie w ciągu kilku minut i poprowadzi Cię przez
+                  zamówienie krok po kroku.
                 </>
-              ) : null}
+              ) : (
+                <>
+                  Dołącz do naszego serwera Discord i stwórz ticketa, aby zamówić
+                  wybrany pakiet.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#C9B9DD]">
-                Email (opcjonalny)
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="ty@example.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="bg-[#0A0014] border-[#B026FF]/30 text-white"
-                data-testid="buy-dialog-email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="server" className="text-[#C9B9DD]">
-                Nazwa serwera (opcjonalna)
-              </Label>
-              <Input
-                id="server"
-                type="text"
-                placeholder="Mój Super Serwer"
-                value={form.server_name}
-                onChange={(e) => setForm({ ...form, server_name: e.target.value })}
-                className="bg-[#0A0014] border-[#B026FF]/30 text-white"
-                data-testid="buy-dialog-server-name"
-              />
+
+          <div className="my-4 nx-card rounded-lg p-4 flex items-center gap-3">
+            <MessageSquare className="w-4 h-4 text-[#FF1E56] flex-shrink-0" />
+            <div className="text-sm">
+              <p className="text-xs uppercase tracking-wider text-[#755D8D]">Discord</p>
+              <p className="font-medium text-white break-all">discord.gg/qBxNmfcMFd</p>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={() => setDialogOpen(false)}
-              className="nx-btn-outline px-5 py-2 rounded-md text-sm"
+              className="nx-btn-outline px-5 py-2.5 rounded-md text-sm"
               data-testid="buy-dialog-cancel"
             >
               Anuluj
             </button>
-            <button
-              onClick={handleCheckout}
-              disabled={submitting}
-              className="nx-btn-primary px-5 py-2 rounded-md text-sm inline-flex items-center gap-2 disabled:opacity-60"
+            <a
+              href={DISCORD_INVITE}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setDialogOpen(false)}
+              className="nx-btn-primary px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
               data-testid="buy-dialog-confirm"
             >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Przekierowanie...
-                </>
-              ) : (
-                <>Zapłać przez Stripe</>
-              )}
-            </button>
+              <MessageSquare className="w-4 h-4" />
+              Przejdź na Discord
+              <ArrowUpRight className="w-4 h-4" />
+            </a>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -301,17 +264,15 @@ function PackageCard({ pkg, index, onBuy }) {
         ))}
       </ul>
 
-      <a
-        href="https://discord.gg/qBxNmfcMFd"
-        target="_blank"
-        rel="noopener noreferrer"
+      <button
+        onClick={onBuy}
         className={`mt-7 ${
           pkg.featured ? "nx-btn-primary" : "nx-btn-outline"
-        } w-full py-3 rounded-md text-sm font-bold transition-all inline-flex items-center justify-center`}
+        } w-full py-3 rounded-md text-sm font-bold transition-all`}
         data-testid={`package-buy-${pkg.id}`}
       >
         Kup teraz
-      </a>
+      </button>
     </motion.div>
   );
 }

@@ -72,9 +72,8 @@ export default function Header() {
 
         <div className="hidden lg:flex items-center gap-3">
           <a
-            href="https://discord.gg/qBxNmfcMFd"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#pakiety"
+            onClick={(e) => handleNavClick(e, "pakiety")}
             className="nx-btn-primary px-5 py-2 rounded-md text-sm"
             data-testid="header-cta-button"
           >
@@ -121,9 +120,8 @@ export default function Header() {
                 </a>
               ))}
               <a
-                href="https://discord.gg/qBxNmfcMFd"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#pakiety"
+                onClick={(e) => handleNavClick(e, "pakiety")}
                 className="nx-btn-primary px-4 py-2 rounded-md text-sm text-center mt-2"
                 data-testid="mobile-cta-button"
               >
