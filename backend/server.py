@@ -495,42 +495,24 @@ DEFAULT_PACKAGES: List[Dict] = [
         "specs": ["24GB RAM", "200GB SSD", "3.0 vCore CPU", "Rozszerzona paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi", "Własna paczka modyfikacji"],
         "featured": False, "sort_order": 4,
     },
-    # Addony
-    {
-        "category": "addons", "name": "DarkRP Premium Pack", "price": 49.0, "old_price": None, "promo_label": None,
-        "description": "Kompletna paczka skryptów DarkRP gotowa do wdrożenia.",
-        "specs": ["50+ unikalnych jobs", "Custom HUD", "System frakcji", "Aktualizacje 6 miesięcy"],
-        "featured": True, "sort_order": 1,
-    },
-    {
-        "category": "addons", "name": "Sandbox Tools Pack", "price": 29.0, "old_price": None, "promo_label": None,
-        "description": "Zestaw narzędzi i broni Sandbox.",
-        "specs": ["20+ narzędzi", "Custom SWEP-y", "Optymalizacja", "Instalacja jednym kliknięciem"],
-        "featured": False, "sort_order": 2,
-    },
-    {
-        "category": "addons", "name": "Murder & TTT Bundle", "price": 39.0, "old_price": 59.0, "promo_label": "-30%",
-        "description": "Dwa popularne tryby w jednym pakiecie.",
-        "specs": ["Murder roleskins", "TTT Custom Roles", "Statystyki graczy", "Anti-cheat"],
-        "featured": False, "sort_order": 3,
-    },
+    # Addony – wkrótce (brak aktywnych pakietów; admin może dodać)
     # Mapy
     {
-        "category": "maps", "name": "rp_downtown_nexus", "price": 19.0, "old_price": None, "promo_label": None,
-        "description": "Autorska mapa miejska zoptymalizowana pod RP.",
-        "specs": ["Pełne miasto", "Optymalizacja 200+ graczy", "Strefy biznesowe", "Customowe textury"],
-        "featured": True, "sort_order": 1,
+        "category": "maps", "name": "Mała", "price": 15.0, "old_price": None, "promo_label": None,
+        "description": "Kompaktowa autorska mapa – idealna dla małej społeczności.",
+        "specs": ["Do ~32 graczy", "Pełna optymalizacja", "Customowe textury", "Instalacja zdalna"],
+        "featured": False, "sort_order": 1,
     },
     {
-        "category": "maps", "name": "gm_construct_premium", "price": 9.0, "old_price": None, "promo_label": None,
-        "description": "Ulepszona wersja klasyka z dodatkowymi strefami.",
-        "specs": ["Strefa pojazdów", "Tor wyścigowy", "Strefa budowniczego", "Lighting HD"],
-        "featured": False, "sort_order": 2,
+        "category": "maps", "name": "Średnia", "price": 20.0, "old_price": None, "promo_label": None,
+        "description": "Wszechstronna mapa średniej wielkości pod różne tryby.",
+        "specs": ["Do ~64 graczy", "Strefy biznesowe i mieszkalne", "Dynamiczne oświetlenie HD", "Instalacja zdalna"],
+        "featured": True, "sort_order": 2,
     },
     {
-        "category": "maps", "name": "ttt_nexus_complex", "price": 29.0, "old_price": 49.0, "promo_label": "-40%",
-        "description": "Mapa do trybu TTT z wieloma sekretami.",
-        "specs": ["3 piętra", "Sekretne przejścia", "Tradery", "Pełna optymalizacja"],
+        "category": "maps", "name": "Duża", "price": 30.0, "old_price": None, "promo_label": None,
+        "description": "Rozległa mapa dla dużych serwerów i pełnego roleplay.",
+        "specs": ["Do ~200 graczy", "Pełne miasto", "Sekretne przejścia i ukryte strefy", "Pełna optymalizacja", "Instalacja zdalna"],
         "featured": False, "sort_order": 3,
     },
 ]
