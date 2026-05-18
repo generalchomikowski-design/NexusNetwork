@@ -10,7 +10,6 @@ const navItems = [
   { id: "addony", label: "Addony" },
   { id: "mapy", label: "Mapy" },
   { id: "pakiety", label: "Pakiety" },
-  { id: "opinie", label: "Opinie" },
   { id: "faq", label: "FAQ" },
   { id: "kontakt", label: "Kontakt" },
 ];

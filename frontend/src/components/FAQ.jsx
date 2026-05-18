@@ -10,15 +10,15 @@ import {
 const faqs = [
   {
     q: "Jak szybko otrzymam dostęp do serwera po zakupie?",
-    a: "Po opłaceniu zamówienia przez Stripe Twój serwer jest automatycznie wdrażany w mniej niż 2 minuty. Dane dostępowe wysyłamy na podany adres email.",
+    a: "Twój serwer jest w pełni skonfigurowany i przekazany w ciągu 24 godzin od zaksięgowania płatności. Dane dostępowe wysyłamy na podany adres email.",
   },
   {
     q: "Czy mogę zmienić pakiet w trakcie trwania abonamentu?",
     a: "Tak, możesz w każdej chwili przejść na wyższy pakiet hostingu z panelu klienta. Różnica w cenie jest naliczana proporcjonalnie do pozostałego okresu.",
   },
   {
-    q: "Czy oferujecie zwroty?",
-    a: "Tak. Jeśli z jakiegokolwiek powodu nie jesteś zadowolony, w ciągu 7 dni od zakupu zwracamy 100% kwoty bez pytań.",
+    q: "Czy oferujecie zwroty pieniędzy?",
+    a: "Co do zasady nie udzielamy zwrotów. Wyjątek stanowią sytuacje, w których błąd leży po naszej stronie (np. brak możliwości dostarczenia usługi z naszej winy) – wtedy zwracamy 100% wpłaconej kwoty.",
   },
   {
     q: "Czy addony i mapy są kompatybilne z najnowszym Garry's Mod?",
@@ -30,7 +30,7 @@ const faqs = [
   },
   {
     q: "Czy oferujecie wsparcie techniczne w języku polskim?",
-    a: "Oczywiście! Nasz polski zespół wsparcia jest dostępny 24/7 na Discordzie, e-mailem i przez system ticketów.",
+    a: "Oczywiście! Nasz polski zespół wsparcia jest dostępny 24/7 na Discordzie oraz przez email.",
   },
   {
     q: "Czy mogę zainstalować własne addony?",

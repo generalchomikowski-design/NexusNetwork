@@ -66,9 +66,9 @@ export default function Hero() {
               data-testid="hero-subtitle"
             >
               Najszybszy hosting, autorskie addony i mapy do Garry's Mod.
-              Zbuduj swój wymarzony serwer w 5 minut.{" "}
+              W pełni skonfigurowany serwer trafia do Ciebie w 24h.{" "}
               <span className="text-white font-semibold">
-                Promocja -50% na wszystkie pakiety!
+                Promocja -50% na pakiety Basic, Normal i Pro!
               </span>
             </motion.p>
 
@@ -103,7 +103,7 @@ export default function Hero() {
               className="mt-12 flex flex-wrap items-center gap-6 sm:gap-10"
             >
               <Metric value="99.9%" label="Uptime" />
-              <Metric value="2 min" label="Czas wdrożenia" />
+              <Metric value="24h" label="Czas wdrożenia" />
               <Metric value="24/7" label="Wsparcie PL" />
               <Metric value="500+" label="Aktywnych serwerów" />
             </motion.div>

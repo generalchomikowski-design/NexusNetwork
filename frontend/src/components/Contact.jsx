@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Mail, MessageSquare, Send, Loader2, Phone } from "lucide-react";
+import { Mail, MessageSquare, Send, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,9 +51,8 @@ export default function Contact() {
             </p>
 
             <div className="mt-10 space-y-4">
-              <ContactItem icon={Mail} label="Email" value="kontakt@nexusnetwork.pl" />
-              <ContactItem icon={MessageSquare} label="Discord" value="discord.gg/nexusnetwork" />
-              <ContactItem icon={Phone} label="Telefon" value="+48 500 123 456" />
+              <ContactItem icon={Mail} label="Email" value="nexus.network.wspolpraca@gmail.com" href="mailto:nexus.network.wspolpraca@gmail.com" />
+              <ContactItem icon={MessageSquare} label="Discord" value="discord.gg/q6NuQTftDh" href="https://discord.gg/q6NuQTftDh" />
             </div>
           </div>
 
@@ -153,16 +152,29 @@ export default function Contact() {
   );
 }
 
-function ContactItem({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-4 nx-card rounded-lg px-5 py-4">
+function ContactItem({ icon: Icon, label, value, href }) {
+  const content = (
+    <>
       <span className="w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/15 to-[#B026FF]/15 border border-[#B026FF]/30 flex items-center justify-center flex-shrink-0">
         <Icon className="w-4 h-4 text-[#FF1E56]" />
       </span>
       <div>
         <p className="text-xs uppercase tracking-wider text-[#755D8D]">{label}</p>
-        <p className="text-sm sm:text-base font-medium text-white">{value}</p>
+        <p className="text-sm sm:text-base font-medium text-white break-all">{value}</p>
       </div>
-    </div>
+    </>
+  );
+  return href ? (
+    <a
+      href={href}
+      target={href.startsWith("http") ? "_blank" : undefined}
+      rel="noopener noreferrer"
+      className="flex items-center gap-4 nx-card rounded-lg px-5 py-4 hover:border-[#FF1E56]/50 transition-colors"
+      data-testid={`contact-link-${label.toLowerCase()}`}
+    >
+      {content}
+    </a>
+  ) : (
+    <div className="flex items-center gap-4 nx-card rounded-lg px-5 py-4">{content}</div>
   );
 }

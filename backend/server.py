@@ -472,19 +472,19 @@ logger = logging.getLogger(__name__)
 DEFAULT_PACKAGES: List[Dict] = [
     # Hosting
     {
-        "category": "hosting", "name": "Basic", "price": 50.0, "old_price": 100.0, "promo_label": "-50%",
+        "category": "hosting", "name": "Basic", "price": 25.0, "old_price": 50.0, "promo_label": "-50%",
         "description": "Idealny start dla małego serwera GMod.",
         "specs": ["6GB RAM", "80GB SSD", "2.0 vCore CPU", "Podstawowa paczka addonów", "Ochrona Anti-DDoS"],
         "featured": False, "sort_order": 1,
     },
     {
-        "category": "hosting", "name": "Normal", "price": 60.0, "old_price": 120.0, "promo_label": "-50%",
+        "category": "hosting", "name": "Normal", "price": 30.0, "old_price": 60.0, "promo_label": "-50%",
         "description": "Wydajny pakiet z 24/7 wsparciem.",
         "specs": ["8GB RAM", "120GB SSD", "3.0 vCore CPU", "Normalna paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi"],
         "featured": False, "sort_order": 2,
     },
     {
-        "category": "hosting", "name": "Pro", "price": 70.0, "old_price": 140.0, "promo_label": "-50%",
+        "category": "hosting", "name": "Pro", "price": 35.0, "old_price": 70.0, "promo_label": "-50%",
         "description": "Najpopularniejszy wybór wśród społeczności.",
         "specs": ["8GB RAM", "120GB SSD", "3.0 vCore CPU", "Rozszerzona paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi", "Własna paczka modyfikacji"],
         "featured": True, "sort_order": 3,

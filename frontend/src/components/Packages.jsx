@@ -110,9 +110,9 @@ export default function Packages() {
             transition={{ delay: 0.15 }}
             className="mt-5 text-base sm:text-lg text-[#A68CC2] max-w-2xl mx-auto"
           >
-            Promocja <span className="text-white font-bold">-50%</span> na wszystkie
-            pakiety hostingu (poza VIP). Płatność jednorazowa przez Stripe – karta,
-            BLIK, Apple Pay i Google Pay.
+            Promocja <span className="text-white font-bold">-50%</span> na pakiety
+            Basic, Normal i Pro. Płatność jednorazowa przez Stripe – karta, BLIK,
+            Apple Pay i Google Pay.
           </motion.p>
         </div>
 
