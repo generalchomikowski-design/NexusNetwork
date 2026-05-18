@@ -301,15 +301,17 @@ function PackageCard({ pkg, index, onBuy }) {
         ))}
       </ul>
 
-      <button
-        onClick={onBuy}
+      <a
+        href="https://discord.gg/qBxNmfcMFd"
+        target="_blank"
+        rel="noopener noreferrer"
         className={`mt-7 ${
           pkg.featured ? "nx-btn-primary" : "nx-btn-outline"
-        } w-full py-3 rounded-md text-sm font-bold transition-all`}
+        } w-full py-3 rounded-md text-sm font-bold transition-all inline-flex items-center justify-center`}
         data-testid={`package-buy-${pkg.id}`}
       >
         Kup teraz
-      </button>
+      </a>
     </motion.div>
   );
 }
