@@ -1,0 +1,145 @@
+{
+  "theme": "Dark",
+  "archetype": "7 (Electric & Neon)",
+  "vibe": "Energetic gaming, high-tech, aggressive, cyberpunk equivalent for Garry's Mod servers",
+  "colors": {
+    "background": {
+      "base": "#0A0014",
+      "surface": "#150029",
+      "card": "#1F003D",
+      "glass": "rgba(10, 0, 20, 0.7)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A68CC2",
+      "muted": "#755D8D"
+    },
+    "accents": {
+      "primary": "#FF1E56",
+      "secondary": "#B026FF",
+      "tertiary": "#FF007F",
+      "success": "#00FF7F",
+      "border": "rgba(176, 38, 255, 0.2)"
+    },
+    "gradients": {
+      "text": "bg-gradient-to-r from-[#FF1E56] to-[#B026FF]",
+      "border": "bg-gradient-to-r from-[#FF1E56] to-[#B026FF]",
+      "glow": "drop-shadow-[0_0_15px_rgba(255,30,86,0.6)]"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "'Unbounded', sans-serif",
+      "body": "'Outfit', sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "h4": "text-lg sm:text-xl font-semibold",
+      "body": "text-base leading-relaxed text-[#A68CC2]",
+      "overline": "uppercase tracking-[0.2em] text-xs font-bold text-[#FF1E56]"
+    }
+  },
+  "layout_and_spacing": {
+    "section_padding": "py-24 sm:py-32 px-6 lg:px-8",
+    "bento_grid": {
+      "marketing": "grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8",
+      "dashboard": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6"
+    },
+    "container": "max-w-7xl mx-auto"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#FF1E56] hover:bg-[#D90429] text-white font-bold py-3 px-6 rounded-sm transition-all duration-300 shadow-[0_0_15px_rgba(255,30,86,0.4)] hover:shadow-[0_0_25px_rgba(255,30,86,0.7)]",
+      "secondary": "bg-transparent border-2 border-[#B026FF] text-white hover:bg-[#B026FF]/10 font-bold py-3 px-6 rounded-sm transition-all duration-300"
+    },
+    "cards": {
+      "base": "bg-[#150029] border border-[#B026FF]/20 rounded-lg p-8 transition-all duration-300 hover:border-[#FF1E56]/50 hover:shadow-[0_0_30px_rgba(255,30,86,0.15)] relative overflow-hidden"
+    },
+    "header": {
+      "style": "fixed top-0 w-full z-50 backdrop-blur-xl bg-[#0A0014]/80 border-b border-[#B026FF]/20 transition-all duration-300"
+    },
+    "badges": {
+      "promo": "absolute top-4 right-4 bg-[#FF1E56] text-white text-xs font-black uppercase px-3 py-1 rounded-sm tracking-wider shadow-[0_0_10px_rgba(255,30,86,0.5)] transform rotate-3"
+    }
+  },
+  "media_urls": {
+    "hero_background": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a6c22810-5978-4df2-9cc1-acf3c498eedb/images/ccf0ae16f5637d91c49c8ca6def08e103199894b1e725c0d74137e9d06ab308c.png",
+      "description": "Abstract energetic glowing neon red/purple void for the hero section background"
+    },
+    "hosting_image": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a6c22810-5978-4df2-9cc1-acf3c498eedb/images/49aaf289ba6f9a0dc74f2d6b5f7607705732c145260b32582285944dba358482.png",
+      "description": "Futuristic server racks glowing with red and purple lights for the Hosting category section"
+    },
+    "addons_image": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a6c22810-5978-4df2-9cc1-acf3c498eedb/images/100051057b670e872a4ac5d0e3507be110cdccf7ac9dc4c0f92e37ee10a2933b.png",
+      "description": "Glowing digital crates/modules for the Addons category section"
+    },
+    "maps_image": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a6c22810-5978-4df2-9cc1-acf3c498eedb/images/cda53c9ce0f21fc0bc1faae2d0be4cd1ac78411878e5f2fe2d26d2acfcb67657.png",
+      "description": "Wireframe neon city landscape for the Maps category section"
+    },
+    "logo_icon": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a6c22810-5978-4df2-9cc1-acf3c498eedb/images/af54af438d2ad1b0d1a96539c51b12b6ae90747330bccb72b9de5662f310cf05.png",
+      "description": "Stylized N logo for navbar and footer"
+    }
+  },
+  "content_requirements": {
+    "language": "pl",
+    "currency": "PLN",
+    "hero_section": {
+      "title": "Nexus Network",
+      "subtitle": "Najlepszy hosting, addony i mapy do Garry's Mod. Zbuduj swój idealny serwer już dziś."
+    },
+    "categories": [
+      "Hosting - Niezawodne serwery oparte o procesory o wysokim taktowaniu",
+      "Addony - Unikalne skrypty i modyfikacje do Twojego serwera",
+      "Mapy - Autorskie, zoptymalizowane mapy tworzone z myślą o roleplay"
+    ],
+    "pricing_packages": [
+      {
+        "name": "Basic",
+        "price": "50 zł",
+        "old_price": "100 zł",
+        "promo": "-50%",
+        "specs": ["6GB RAM", "80GB SSD", "2.0 vCore CPU", "Podstawowa paczka addonów", "Ochrona Anti-DDoS"]
+      },
+      {
+        "name": "Normal",
+        "price": "60 zł",
+        "old_price": "120 zł",
+        "promo": "-50%",
+        "specs": ["8GB RAM", "120GB SSD", "3.0 vCore CPU", "Normalna paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi"]
+      },
+      {
+        "name": "Pro",
+        "price": "70 zł",
+        "old_price": "140 zł",
+        "promo": "-50%",
+        "specs": ["8GB RAM", "120GB SSD", "3.0 vCore CPU", "Rozszerzona paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi", "Własna paczka modyfikacji"]
+      },
+      {
+        "name": "VIP",
+        "price": "100 zł",
+        "old_price": null,
+        "promo": null,
+        "specs": ["24GB RAM", "200GB SSD", "3.0 vCore CPU", "Rozszerzona paczka addonów", "Ochrona Anti-DDoS", "Wsparcie 24/7", "Gotowe configi", "Własna paczka modyfikacji"]
+      }
+    ]
+  },
+  "accessibility_and_testing": {
+    "data_testid_rule": "All interactive elements (buttons, links, inputs, package cards) must have a data-testid attribute.",
+    "contrast": "Ensure text over images uses a background overlay (e.g., bg-black/60) to maintain legibility."
+  },
+  "instructions_to_main_agent": [
+    "Install and use lucide-react for icons (e.g., Server, Package, Map, Shield, Zap, ChevronDown).",
+    "Use framer-motion for energetic entrance animations, especially on the Hero section and Package cards.",
+    "Implement the 'Kup teraz' (Buy now) buttons in the pricing section to redirect to a Stripe checkout (this can be a mockup link or a redirect to an API route).",
+    "Admin panel should be built on the `/admin` route with a data table for managing the packages. Use Shadcn Table component.",
+    "Ensure 'Nexus Network' is the prominent H1 on startup, styled with the text gradient.",
+    "Import Google Fonts: 'Unbounded' (Weights 400, 700, 900) and 'Outfit' (Weights 400, 500, 600, 700) in the root HTML/CSS.",
+    "Use custom grid layouts instead of generic standard columns for the features section."
+  ]
+}
