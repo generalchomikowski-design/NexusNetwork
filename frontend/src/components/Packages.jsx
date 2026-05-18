@@ -157,7 +157,7 @@ export default function Packages() {
                   <span className="text-white font-semibold">{selected.name}</span>
                   {" "}({formatPLN(selected.price)}), dołącz do naszego serwera
                   Discord i stwórz ticketa w kanale{" "}
-                  <span className="text-white font-semibold">#zamówienia</span>.
+                  <span className="text-white font-semibold">#ticket</span>.
                   Nasz zespół odpowie w ciągu kilku minut i poprowadzi Cię przez
                   zamówienie krok po kroku.
                 </>
