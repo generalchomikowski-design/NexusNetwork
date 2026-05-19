@@ -1,10 +1,11 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict
@@ -201,6 +202,222 @@ async def require_super_admin(email: str = Depends(require_admin)) -> str:
     if email.lower() != SUPER_ADMIN_EMAIL.lower():
         raise HTTPException(status_code=403, detail="Tylko super-admin może wykonać tę operację")
     return email
+
+
+# ====== CUSTOMER AUTH (JWT + Google via Emergent) ======
+
+USER_JWT_TTL_DAYS = 7
+EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+
+
+class UserPublic(BaseModel):
+    user_id: str
+    email: str
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    provider: str  # "password" | "google"
+
+
+class RegisterPayload(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=200)
+    name: Optional[str] = Field(default=None, max_length=120)
+
+
+class LoginPayload(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class GoogleSessionPayload(BaseModel):
+    session_id: str = Field(min_length=8, max_length=400)
+
+
+def create_user_jwt(user_id: str, email: str) -> str:
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "type": "user",
+        "exp": datetime.now(timezone.utc) + timedelta(days=USER_JWT_TTL_DAYS),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def set_user_auth_cookie(response: Response, name: str, value: str, max_age: int) -> None:
+    # Same-origin via Kubernetes ingress, so lax + secure works in production
+    response.set_cookie(
+        key=name, value=value, httponly=True, secure=True,
+        samesite="none", max_age=max_age, path="/",
+    )
+
+
+def clear_user_auth_cookies(response: Response) -> None:
+    for n in ("nx_user_token", "nx_session_token"):
+        response.delete_cookie(key=n, path="/")
+
+
+def user_doc_to_public(doc: Dict) -> UserPublic:
+    return UserPublic(
+        user_id=doc["user_id"],
+        email=doc["email"],
+        name=doc.get("name"),
+        picture=doc.get("picture"),
+        provider=doc.get("provider", "password"),
+    )
+
+
+async def get_current_user(request: Request) -> Dict:
+    """Resolve current customer via JWT cookie/Authorization header OR Google session cookie."""
+    # 1) JWT (password auth)
+    token = request.cookies.get("nx_user_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            if payload.get("type") == "user":
+                user_id = payload.get("sub")
+                doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+                if doc:
+                    return doc
+        except jwt.PyJWTError:
+            pass
+
+    # 2) Google session token (set by /api/auth/google/session)
+    session_token = request.cookies.get("nx_session_token")
+    if session_token:
+        sess = await db.user_sessions.find_one({"session_token": session_token}, {"_id": 0})
+        if sess:
+            expires_at = sess.get("expires_at")
+            if isinstance(expires_at, str):
+                try:
+                    expires_at = datetime.fromisoformat(expires_at)
+                except Exception:
+                    expires_at = None
+            if expires_at:
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                if expires_at >= datetime.now(timezone.utc):
+                    doc = await db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0})
+                    if doc:
+                        return doc
+
+    raise HTTPException(status_code=401, detail="Brak autoryzacji")
+
+
+async def require_user(user: Dict = Depends(get_current_user)) -> Dict:
+    return user
+
+
+@api_router.post("/auth/register", response_model=UserPublic)
+async def auth_register(payload: RegisterPayload, response: Response):
+    email = payload.email.lower().strip()
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Konto z tym adresem email już istnieje")
+    user_id = f"user_{uuid.uuid4().hex[:14]}"
+    doc = {
+        "user_id": user_id,
+        "email": email,
+        "name": payload.name or email.split("@")[0],
+        "picture": None,
+        "provider": "password",
+        "password_hash": hash_password(payload.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.insert_one(doc)
+    token = create_user_jwt(user_id, email)
+    set_user_auth_cookie(response, "nx_user_token", token, max_age=USER_JWT_TTL_DAYS * 24 * 3600)
+    return user_doc_to_public(doc)
+
+
+@api_router.post("/auth/login", response_model=UserPublic)
+async def auth_login(payload: LoginPayload, response: Response):
+    email = payload.email.lower().strip()
+    doc = await db.users.find_one({"email": email}, {"_id": 0})
+    if not doc or not doc.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Niepoprawny email lub hasło")
+    if not verify_password(payload.password, doc["password_hash"]):
+        raise HTTPException(status_code=401, detail="Niepoprawny email lub hasło")
+    token = create_user_jwt(doc["user_id"], email)
+    set_user_auth_cookie(response, "nx_user_token", token, max_age=USER_JWT_TTL_DAYS * 24 * 3600)
+    return user_doc_to_public(doc)
+
+
+@api_router.post("/auth/logout")
+async def auth_logout(request: Request, response: Response):
+    # Best-effort: also remove Google session if cookie present
+    sess_token = request.cookies.get("nx_session_token")
+    if sess_token:
+        await db.user_sessions.delete_one({"session_token": sess_token})
+    clear_user_auth_cookies(response)
+    return {"ok": True}
+
+
+@api_router.get("/auth/me", response_model=UserPublic)
+async def auth_me(user: Dict = Depends(require_user)):
+    return user_doc_to_public(user)
+
+
+@api_router.post("/auth/google/session", response_model=UserPublic)
+async def auth_google_session(payload: GoogleSessionPayload, response: Response):
+    # Exchange session_id with Emergent backend
+    async with httpx.AsyncClient(timeout=15) as client:
+        try:
+            r = await client.get(EMERGENT_AUTH_URL, headers={"X-Session-ID": payload.session_id})
+        except Exception as e:
+            logging.exception("Emergent auth call failed")
+            raise HTTPException(status_code=502, detail=f"Błąd autoryzacji Google: {e}")
+    if r.status_code != 200:
+        raise HTTPException(status_code=401, detail="Niepoprawna sesja Google")
+    data = r.json()
+    email = (data.get("email") or "").lower().strip()
+    name = data.get("name")
+    picture = data.get("picture")
+    session_token = data.get("session_token")
+    if not email or not session_token:
+        raise HTTPException(status_code=502, detail="Nieprawidłowa odpowiedź autoryzacji")
+
+    # Upsert user
+    existing = await db.users.find_one({"email": email}, {"_id": 0})
+    if existing:
+        user_id = existing["user_id"]
+        await db.users.update_one(
+            {"user_id": user_id},
+            {"$set": {"name": name or existing.get("name"), "picture": picture or existing.get("picture")}},
+        )
+        user_doc = {**existing, "name": name or existing.get("name"), "picture": picture or existing.get("picture")}
+    else:
+        user_id = f"user_{uuid.uuid4().hex[:14]}"
+        user_doc = {
+            "user_id": user_id,
+            "email": email,
+            "name": name or email.split("@")[0],
+            "picture": picture,
+            "provider": "google",
+            "password_hash": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.users.insert_one(user_doc)
+
+    # Store session
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    await db.user_sessions.update_one(
+        {"session_token": session_token},
+        {"$set": {
+            "session_token": session_token,
+            "user_id": user_id,
+            "email": email,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    set_user_auth_cookie(response, "nx_session_token", session_token, max_age=7 * 24 * 3600)
+    return user_doc_to_public(user_doc)
 
 
 def doc_to_package(doc: Dict) -> Package:
@@ -591,6 +808,15 @@ DEFAULT_PACKAGES: List[Dict] = [
 
 @app.on_event("startup")
 async def seed_data():
+    # Indexes for customer auth collections
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("user_id", unique=True)
+        await db.user_sessions.create_index("session_token", unique=True)
+        await db.user_sessions.create_index("user_id")
+    except Exception as e:
+        logging.warning(f"Index creation: {e}")
+
     # Seed admin
     existing_admin = await db.admins.find_one({"email": ADMIN_EMAIL}, {"_id": 0})
     if not existing_admin:

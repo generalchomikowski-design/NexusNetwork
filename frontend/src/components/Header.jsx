@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Hexagon } from "lucide-react";
+import { Menu, X, Hexagon, LogOut, UserCircle2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
   { id: "hero", label: "Start" },
@@ -17,6 +18,7 @@ const navItems = [
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -79,6 +81,29 @@ export default function Header() {
           >
             Kup teraz
           </a>
+          {user && (
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#B026FF]/30 bg-[#150029]/60"
+              data-testid="header-user-chip"
+            >
+              {user.picture ? (
+                <img src={user.picture} alt="" className="w-5 h-5 rounded-full" />
+              ) : (
+                <UserCircle2 className="w-4 h-4 text-[#B026FF]" />
+              )}
+              <span className="text-xs text-[#C9B9DD] max-w-[140px] truncate">
+                {user.name || user.email}
+              </span>
+              <button
+                onClick={logout}
+                className="text-[#A68CC2] hover:text-[#FF1E56] transition-colors"
+                title="Wyloguj"
+                data-testid="header-logout-button"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           <Link
             to="/admin/login"
             className="text-xs text-[#755D8D] hover:text-white transition-colors"
@@ -127,6 +152,19 @@ export default function Header() {
               >
                 Kup teraz
               </a>
+              {user && (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    logout();
+                  }}
+                  className="nx-btn-outline px-4 py-2 rounded-md text-sm text-center inline-flex items-center justify-center gap-2"
+                  data-testid="mobile-logout-button"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Wyloguj ({user.email})
+                </button>
+              )}
               <Link
                 to="/admin/login"
                 className="text-xs text-[#755D8D] hover:text-white text-center"

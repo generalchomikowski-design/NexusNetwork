@@ -6,6 +6,7 @@ export const API_BASE = `${BACKEND_URL}/api`;
 export const api = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 // Attach admin token if present
