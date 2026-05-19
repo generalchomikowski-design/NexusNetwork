@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw, ShieldCheck, UserPlus, Crown } from "lucide-react";
+import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw, ShieldCheck, UserPlus, Crown, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,6 +55,7 @@ export default function AdminDashboard() {
   const [packages, setPackages] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [admins, setAdmins] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [me, setMe] = useState({ email: "", is_super: false });
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // package or null
@@ -89,12 +90,14 @@ export default function AdminDashboard() {
       const calls = [
         api.get("/packages?active_only=false"),
         api.get("/admin/transactions"),
+        api.get("/admin/contacts"),
       ];
       if (isSuper) calls.push(api.get("/admin/admins"));
       const results = await Promise.all(calls);
       setPackages(results[0].data || []);
       setTransactions(results[1].data || []);
-      if (isSuper && results[2]) setAdmins(results[2].data || []);
+      setContacts(results[2].data || []);
+      if (isSuper && results[3]) setAdmins(results[3].data || []);
     } catch (e) {
       toast.error("Błąd ładowania danych");
     } finally {
@@ -283,6 +286,14 @@ export default function AdminDashboard() {
             >
               Transakcje ({transactions.length})
             </TabsTrigger>
+            <TabsTrigger
+              value="messages"
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF1E56] data-[state=active]:to-[#B026FF]"
+              data-testid="admin-tab-messages"
+            >
+              <Mail className="w-3.5 h-3.5 mr-1" />
+              Wiadomości ({contacts.length})
+            </TabsTrigger>
             {me.is_super && (
               <TabsTrigger
                 value="admins"
@@ -456,6 +467,60 @@ export default function AdminDashboard() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="messages">
+            <div className="nx-card rounded-xl overflow-hidden">
+              {loading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="w-8 h-8 text-[#FF1E56] animate-spin" />
+                </div>
+              ) : contacts.length === 0 ? (
+                <p className="text-center py-12 text-[#A68CC2]">
+                  Brak wiadomości z formularza kontaktowego.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[#B026FF]/15">
+                  {contacts.map((c) => (
+                    <li
+                      key={c.id}
+                      className="p-5 hover:bg-[#B026FF]/5 transition-colors"
+                      data-testid={`admin-message-${c.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="inline-flex w-9 h-9 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+                            <Mail className="w-4 h-4 text-[#FF1E56]" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-display font-bold text-white truncate">
+                              {c.name}
+                            </p>
+                            <a
+                              href={`mailto:${c.email}`}
+                              className="text-xs text-[#A68CC2] hover:text-white"
+                            >
+                              {c.email}
+                            </a>
+                          </div>
+                        </div>
+                        <span className="text-xs text-[#755D8D] whitespace-nowrap">
+                          {c.created_at?.slice(0, 19).replace("T", " ")}
+                        </span>
+                      </div>
+                      {c.subject && (
+                        <p className="text-sm font-semibold text-[#C9B9DD] mb-1.5 ml-12">
+                          Temat: {c.subject}
+                        </p>
+                      )}
+                      <p className="text-sm text-[#A68CC2] leading-relaxed whitespace-pre-wrap ml-12">
+                        {c.message}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </TabsContent>
