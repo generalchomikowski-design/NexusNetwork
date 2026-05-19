@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw } from "lucide-react";
+import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw, ShieldCheck, UserPlus, Crown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,11 +54,15 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [me, setMe] = useState({ email: "", is_super: false });
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // package or null
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [adminForm, setAdminForm] = useState({ email: "", password: "" });
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("nx_admin_token");
@@ -68,7 +72,10 @@ export default function AdminDashboard() {
     }
     api
       .get("/admin/me")
-      .then(loadAll)
+      .then((res) => {
+        setMe(res.data || { email: "", is_super: false });
+        loadAll(res.data?.is_super);
+      })
       .catch(() => {
         localStorage.removeItem("nx_admin_token");
         navigate("/admin/login");
@@ -76,19 +83,57 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadAll = async () => {
+  const loadAll = async (isSuper) => {
     setLoading(true);
     try {
-      const [pkgs, txns] = await Promise.all([
+      const calls = [
         api.get("/packages?active_only=false"),
         api.get("/admin/transactions"),
-      ]);
-      setPackages(pkgs.data || []);
-      setTransactions(txns.data || []);
+      ];
+      if (isSuper) calls.push(api.get("/admin/admins"));
+      const results = await Promise.all(calls);
+      setPackages(results[0].data || []);
+      setTransactions(results[1].data || []);
+      if (isSuper && results[2]) setAdmins(results[2].data || []);
     } catch (e) {
       toast.error("Błąd ładowania danych");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createAdmin = async () => {
+    if (!adminForm.email || !adminForm.password) {
+      toast.error("Wpisz email i hasło");
+      return;
+    }
+    if (adminForm.password.length < 6) {
+      toast.error("Hasło musi mieć co najmniej 6 znaków");
+      return;
+    }
+    setCreatingAdmin(true);
+    try {
+      await api.post("/admin/admins", adminForm);
+      toast.success("Administrator dodany");
+      setAdminForm({ email: "", password: "" });
+      const res = await api.get("/admin/admins");
+      setAdmins(res.data || []);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Błąd dodawania administratora");
+    } finally {
+      setCreatingAdmin(false);
+    }
+  };
+
+  const deleteAdmin = async (email) => {
+    if (!window.confirm(`Usunąć administratora ${email}?`)) return;
+    try {
+      await api.delete(`/admin/admins/${encodeURIComponent(email)}`);
+      toast.success("Administrator usunięty");
+      const res = await api.get("/admin/admins");
+      setAdmins(res.data || []);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Błąd usuwania");
     }
   };
 
@@ -147,7 +192,7 @@ export default function AdminDashboard() {
         toast.success("Pakiet utworzony");
       }
       setDialogOpen(false);
-      loadAll();
+      loadAll(me.is_super);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Błąd zapisu");
     } finally {
@@ -160,7 +205,7 @@ export default function AdminDashboard() {
     try {
       await api.delete(`/admin/packages/${pkg.id}`);
       toast.success("Pakiet usunięty");
-      loadAll();
+      loadAll(me.is_super);
     } catch (e) {
       toast.error("Błąd usuwania");
     }
@@ -181,7 +226,7 @@ export default function AdminDashboard() {
           </Link>
           <div className="flex items-center gap-3">
             <button
-              onClick={loadAll}
+              onClick={() => loadAll(me.is_super)}
               className="nx-btn-outline px-4 py-2 rounded-md text-sm inline-flex items-center gap-2"
               data-testid="admin-refresh-button"
             >
@@ -201,8 +246,25 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="font-display font-black text-3xl">Panel zarządzania</h1>
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+          <div>
+            <h1 className="font-display font-black text-3xl">Panel zarządzania</h1>
+            {me.email && (
+              <p className="text-xs text-[#A68CC2] mt-1 inline-flex items-center gap-2">
+                {me.is_super ? (
+                  <>
+                    <Crown className="w-3 h-3 text-[#FF1E56]" />
+                    Super-admin: {me.email}
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3 h-3 text-[#B026FF]" />
+                    Admin: {me.email}
+                  </>
+                )}
+              </p>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="packages">
@@ -221,6 +283,16 @@ export default function AdminDashboard() {
             >
               Transakcje ({transactions.length})
             </TabsTrigger>
+            {me.is_super && (
+              <TabsTrigger
+                value="admins"
+                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF1E56] data-[state=active]:to-[#B026FF]"
+                data-testid="admin-tab-admins"
+              >
+                <Crown className="w-3.5 h-3.5 mr-1" />
+                Administratorzy ({admins.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="packages">
@@ -337,8 +409,9 @@ export default function AdminDashboard() {
                     <TableRow className="border-[#B026FF]/15 hover:bg-transparent">
                       <TableHead className="text-[#A68CC2]">Pakiet</TableHead>
                       <TableHead className="text-[#A68CC2]">Email</TableHead>
+                      <TableHead className="text-[#A68CC2]">Discord</TableHead>
+                      <TableHead className="text-[#A68CC2]">Opis</TableHead>
                       <TableHead className="text-[#A68CC2]">Kwota</TableHead>
-                      <TableHead className="text-[#A68CC2]">Status</TableHead>
                       <TableHead className="text-[#A68CC2]">Płatność</TableHead>
                       <TableHead className="text-[#A68CC2]">Data</TableHead>
                     </TableRow>
@@ -356,10 +429,15 @@ export default function AdminDashboard() {
                         <TableCell className="text-[#A68CC2] text-sm">
                           {t.customer_email || "—"}
                         </TableCell>
+                        <TableCell className="text-[#A68CC2] text-sm">
+                          {t.discord_name || "—"}
+                        </TableCell>
+                        <TableCell className="text-[#A68CC2] text-xs max-w-[260px] truncate" title={t.description || ""}>
+                          {t.description || "—"}
+                        </TableCell>
                         <TableCell className="text-white font-semibold">
                           {formatPLN(t.amount)}
                         </TableCell>
-                        <TableCell className="text-[#A68CC2] text-sm">{t.status}</TableCell>
                         <TableCell>
                           <span
                             className={`text-xs font-bold ${
@@ -381,6 +459,117 @@ export default function AdminDashboard() {
               )}
             </div>
           </TabsContent>
+
+          {me.is_super && (
+            <TabsContent value="admins">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="nx-card rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center">
+                      <UserPlus className="w-4 h-4 text-[#FF1E56]" />
+                    </span>
+                    <div>
+                      <h3 className="font-display font-bold text-lg text-white">
+                        Dodaj administratora
+                      </h3>
+                      <p className="text-xs text-[#A68CC2]">
+                        Nowy admin będzie mógł zarządzać pakietami i transakcjami.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[#C9B9DD]">Email</Label>
+                      <Input
+                        type="email"
+                        value={adminForm.email}
+                        onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                        placeholder="nowy.admin@example.pl"
+                        className="bg-[#0A0014] border-[#B026FF]/30 text-white"
+                        data-testid="admin-create-email"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[#C9B9DD]">Hasło</Label>
+                      <Input
+                        type="text"
+                        value={adminForm.password}
+                        onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                        placeholder="min. 6 znaków"
+                        className="bg-[#0A0014] border-[#B026FF]/30 text-white font-mono"
+                        data-testid="admin-create-password"
+                      />
+                      <p className="text-xs text-[#755D8D]">
+                        Przekaż hasło nowemu administratorowi w bezpieczny sposób –
+                        Twoja platforma nie wysyła go automatycznie.
+                      </p>
+                    </div>
+                    <button
+                      onClick={createAdmin}
+                      disabled={creatingAdmin}
+                      className="nx-btn-primary w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                      data-testid="admin-create-submit"
+                    >
+                      {creatingAdmin ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="w-4 h-4" />
+                      )}
+                      Dodaj administratora
+                    </button>
+                  </div>
+                </div>
+
+                <div className="nx-card rounded-xl p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center">
+                      <ShieldCheck className="w-4 h-4 text-[#FF1E56]" />
+                    </span>
+                    <h3 className="font-display font-bold text-lg text-white">
+                      Lista administratorów ({admins.length})
+                    </h3>
+                  </div>
+                  {admins.length === 0 ? (
+                    <p className="text-sm text-[#A68CC2]">Brak administratorów.</p>
+                  ) : (
+                    <ul className="divide-y divide-[#B026FF]/15">
+                      {admins.map((a) => (
+                        <li
+                          key={a.email}
+                          className="flex items-center justify-between py-3"
+                          data-testid={`admin-row-${a.email}`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {a.role === "super" ? (
+                              <Crown className="w-4 h-4 text-[#FF1E56] flex-shrink-0" />
+                            ) : (
+                              <ShieldCheck className="w-4 h-4 text-[#B026FF] flex-shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm text-white truncate">{a.email}</p>
+                              <p className="text-xs text-[#755D8D]">
+                                {a.role === "super" ? "Super-admin" : "Admin"}
+                              </p>
+                            </div>
+                          </div>
+                          {a.role !== "super" && (
+                            <button
+                              onClick={() => deleteAdmin(a.email)}
+                              className="p-2 rounded-md hover:bg-[#FF1E56]/10 text-[#A68CC2] hover:text-[#FF1E56] transition-colors"
+                              data-testid={`admin-delete-row-${a.email}`}
+                              title="Usuń administratora"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </main>
 

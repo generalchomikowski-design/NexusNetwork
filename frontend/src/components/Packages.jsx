@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map, MessageSquare, Ticket, ArrowUpRight, CreditCard } from "lucide-react";
+import { Check, Sparkles, Loader2, Server, Package as PackageIcon, Map, MessageSquare, Ticket, ArrowUpRight, CreditCard, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,6 +15,9 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { api, formatPLN } from "@/lib/api";
 
 const CATEGORY_LABELS = {
@@ -26,12 +28,16 @@ const CATEGORY_LABELS = {
 
 const DISCORD_INVITE = "https://discord.gg/qBxNmfcMFd";
 
+const emptyForm = { customer_email: "", discord_name: "", description: "" };
+
 export default function Packages() {
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("hosting");
   const [selected, setSelected] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [view, setView] = useState("choose"); // choose | stripe-form
+  const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,16 +55,25 @@ export default function Packages() {
 
   const onBuyClick = (pkg) => {
     setSelected(pkg);
+    setView("choose");
+    setForm(emptyForm);
     setDialogOpen(true);
   };
 
   const handleStripeCheckout = async () => {
     if (!selected) return;
+    if (!form.customer_email || !form.discord_name || !form.description) {
+      toast.error("Uzupełnij wszystkie pola formularza");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post("/checkout/create", {
         package_id: selected.id,
         origin_url: window.location.origin,
+        customer_email: form.customer_email,
+        discord_name: form.discord_name,
+        description: form.description,
       });
       if (res.data?.url) {
         window.location.href = res.data.url;
@@ -66,7 +81,8 @@ export default function Packages() {
         toast.error("Brak adresu Stripe");
       }
     } catch (e) {
-      const msg = e.response?.data?.detail || "Błąd płatności";
+      const detail = e.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : Array.isArray(detail) ? detail.map((d) => d.msg).join(", ") : "Błąd płatności";
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -161,7 +177,7 @@ export default function Packages() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-[#150029] border-[#B026FF]/30 text-white sm:max-w-lg"
+          className="bg-[#150029] border-[#B026FF]/30 text-white sm:max-w-lg max-h-[90vh] overflow-y-auto"
           data-testid="buy-dialog"
         >
           <DialogHeader>
@@ -175,7 +191,9 @@ export default function Packages() {
                   <span className="text-white font-bold">
                     {formatPLN(selected.price)}
                   </span>
-                  . Wybierz wygodną dla Ciebie metodę płatności.
+                  {view === "choose"
+                    ? ". Wybierz wygodną dla Ciebie metodę płatności."
+                    : ". Wypełnij dane, aby przejść do Stripe."}
                 </>
               ) : (
                 "Wybierz wygodną dla Ciebie metodę płatności."
@@ -183,82 +201,155 @@ export default function Packages() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Stripe option */}
-          <div className="nx-card rounded-lg p-5 mt-3">
-            <div className="flex items-start gap-3 mb-4">
-              <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
-                <CreditCard className="w-4 h-4 text-[#FF1E56]" />
-              </span>
-              <div>
-                <p className="font-display font-bold text-white">
-                  Zapłać kartą (Stripe)
-                </p>
-                <p className="text-xs text-[#A68CC2] mt-0.5">
-                  Karta, BLIK, Apple Pay, Google Pay. Po opłaceniu skontaktujemy się
-                  z Tobą mailowo w ciągu 24h.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleStripeCheckout}
-              disabled={submitting}
-              className="nx-btn-primary w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
-              data-testid="buy-dialog-stripe"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Przekierowanie...
-                </>
-              ) : (
-                <>
+          {view === "choose" && (
+            <>
+              <div className="nx-card rounded-lg p-5 mt-3">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+                    <CreditCard className="w-4 h-4 text-[#FF1E56]" />
+                  </span>
+                  <div>
+                    <p className="font-display font-bold text-white">
+                      Zapłać kartą (Stripe)
+                    </p>
+                    <p className="text-xs text-[#A68CC2] mt-0.5">
+                      Karta, BLIK, Apple Pay, Google Pay. Najpierw uzupełniasz dane
+                      kontaktowe.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setView("stripe-form")}
+                  className="nx-btn-primary w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
+                  data-testid="buy-dialog-stripe"
+                >
                   <CreditCard className="w-4 h-4" />
                   Zapłać przez Stripe
-                </>
-              )}
-            </button>
-          </div>
+                </button>
+              </div>
 
-          {/* Discord ticket option */}
-          <div className="nx-card rounded-lg p-5 mt-3">
-            <div className="flex items-start gap-3 mb-4">
-              <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
-                <Ticket className="w-4 h-4 text-[#FF1E56]" />
-              </span>
-              <div>
-                <p className="font-display font-bold text-white">
-                  Stwórz ticketa na Discordzie
-                </p>
-                <p className="text-xs text-[#A68CC2] mt-0.5">
-                  Dołącz do serwera i otwórz ticket w kanale{" "}
-                  <span className="text-white font-semibold">#ticket</span>. Nasz
-                  zespół poprowadzi Cię przez zamówienie.
+              <div className="nx-card rounded-lg p-5 mt-3">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="inline-flex w-10 h-10 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+                    <Ticket className="w-4 h-4 text-[#FF1E56]" />
+                  </span>
+                  <div>
+                    <p className="font-display font-bold text-white">
+                      Stwórz ticketa na Discordzie
+                    </p>
+                    <p className="text-xs text-[#A68CC2] mt-0.5">
+                      Dołącz do serwera i otwórz ticket w kanale{" "}
+                      <span className="text-white font-semibold">#ticket</span>.
+                      Nasz zespół poprowadzi Cię przez zamówienie.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={DISCORD_INVITE}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setDialogOpen(false)}
+                  className="nx-btn-outline w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
+                  data-testid="buy-dialog-ticket"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Przejdź na Discord
+                  <ArrowUpRight className="w-4 h-4" />
+                </a>
+              </div>
+
+              <div className="mt-2 flex justify-end">
+                <button
+                  onClick={() => setDialogOpen(false)}
+                  className="text-sm text-[#A68CC2] hover:text-white transition-colors"
+                  data-testid="buy-dialog-cancel"
+                >
+                  Anuluj
+                </button>
+              </div>
+            </>
+          )}
+
+          {view === "stripe-form" && (
+            <div className="mt-2 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cust-email" className="text-[#C9B9DD]">
+                  Email *
+                </Label>
+                <Input
+                  id="cust-email"
+                  type="email"
+                  value={form.customer_email}
+                  onChange={(e) => setForm({ ...form, customer_email: e.target.value })}
+                  placeholder="ty@example.com"
+                  className="bg-[#0A0014] border-[#B026FF]/30 text-white"
+                  required
+                  data-testid="buy-form-email"
+                />
+                <p className="text-xs text-[#755D8D]">
+                  Wyślemy tu potwierdzenie zamówienia oraz dane dostępowe.
                 </p>
               </div>
-            </div>
-            <a
-              href={DISCORD_INVITE}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setDialogOpen(false)}
-              className="nx-btn-outline w-full px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2"
-              data-testid="buy-dialog-ticket"
-            >
-              <MessageSquare className="w-4 h-4" />
-              Przejdź na Discord
-              <ArrowUpRight className="w-4 h-4" />
-            </a>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="discord-name" className="text-[#C9B9DD]">
+                  Nazwa Discord *
+                </Label>
+                <Input
+                  id="discord-name"
+                  value={form.discord_name}
+                  onChange={(e) => setForm({ ...form, discord_name: e.target.value })}
+                  placeholder="np. nick lub nick#1234"
+                  className="bg-[#0A0014] border-[#B026FF]/30 text-white"
+                  required
+                  data-testid="buy-form-discord"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cust-desc" className="text-[#C9B9DD]">
+                  Co dokładnie chcesz zamówić? *
+                </Label>
+                <Textarea
+                  id="cust-desc"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="Opisz dokładnie czego od nas oczekujesz – tryb gry (DarkRP/Sandbox/TTT), modyfikacje, nazwa serwera, dodatki, etc."
+                  className="bg-[#0A0014] border-[#B026FF]/30 text-white min-h-[140px]"
+                  required
+                  data-testid="buy-form-description"
+                />
+              </div>
 
-          <DialogFooter className="mt-2">
-            <button
-              onClick={() => setDialogOpen(false)}
-              className="text-sm text-[#A68CC2] hover:text-white transition-colors"
-              data-testid="buy-dialog-cancel"
-            >
-              Anuluj
-            </button>
-          </DialogFooter>
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  onClick={() => setView("choose")}
+                  disabled={submitting}
+                  className="nx-btn-outline px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                  data-testid="buy-form-back"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Wstecz
+                </button>
+                <button
+                  onClick={handleStripeCheckout}
+                  disabled={submitting}
+                  className="nx-btn-primary flex-1 px-5 py-2.5 rounded-md text-sm inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                  data-testid="buy-form-submit"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Przekierowanie...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      Przejdź do Stripe
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </section>

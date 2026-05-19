@@ -39,6 +39,7 @@ JWT_EXPIRES_HOURS = 24
 # Admin seed
 ADMIN_EMAIL = os.environ["ADMIN_EMAIL"]
 ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
+SUPER_ADMIN_EMAIL = "generalchomikowski@gmail.com"
 
 app = FastAPI(title="Nexus Network API")
 api_router = APIRouter(prefix="/api")
@@ -102,7 +103,9 @@ class AuthResponse(BaseModel):
 class CheckoutCreate(BaseModel):
     package_id: str
     origin_url: str
-    customer_email: Optional[EmailStr] = None
+    customer_email: EmailStr
+    discord_name: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=1, max_length=2000)
     server_name: Optional[str] = None
 
 
@@ -137,8 +140,21 @@ class TransactionOut(BaseModel):
     status: str
     payment_status: str
     customer_email: Optional[str] = None
+    discord_name: Optional[str] = None
+    description: Optional[str] = None
     server_name: Optional[str] = None
     created_at: str
+
+
+class AdminCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=200)
+
+
+class AdminOut(BaseModel):
+    email: str
+    role: str
+    created_at: Optional[str] = None
 
 
 # ====== HELPERS ======
@@ -179,6 +195,12 @@ async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(secu
         raise HTTPException(status_code=401, detail="Token wygasł")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Niepoprawny token")
+
+
+async def require_super_admin(email: str = Depends(require_admin)) -> str:
+    if email.lower() != SUPER_ADMIN_EMAIL.lower():
+        raise HTTPException(status_code=403, detail="Tylko super-admin może wykonać tę operację")
+    return email
 
 
 def doc_to_package(doc: Dict) -> Package:
@@ -223,7 +245,50 @@ async def admin_login(payload: AdminLogin):
 
 @api_router.get("/admin/me")
 async def admin_me(email: str = Depends(require_admin)):
-    return {"email": email}
+    is_super = email.lower() == SUPER_ADMIN_EMAIL.lower()
+    return {"email": email, "role": "super" if is_super else "admin", "is_super": is_super}
+
+
+# ====== SUPER-ADMIN: manage admins ======
+
+@api_router.get("/admin/admins", response_model=List[AdminOut])
+async def list_admins(_: str = Depends(require_super_admin)):
+    docs = await db.admins.find({}, {"_id": 0, "email": 1, "created_at": 1}).sort("created_at", 1).to_list(200)
+    out: List[AdminOut] = []
+    for d in docs:
+        email = d.get("email", "")
+        role = "super" if email.lower() == SUPER_ADMIN_EMAIL.lower() else "admin"
+        out.append(AdminOut(email=email, role=role, created_at=d.get("created_at")))
+    return out
+
+
+@api_router.post("/admin/admins", response_model=AdminOut)
+async def create_admin(payload: AdminCreate, _: str = Depends(require_super_admin)):
+    email = payload.email.lower()
+    existing = await db.admins.find_one({"email": email}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Administrator z tym adresem email już istnieje")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.admins.insert_one(doc)
+    return AdminOut(email=email, role="admin", created_at=doc["created_at"])
+
+
+@api_router.delete("/admin/admins/{email}")
+async def delete_admin(email: str, current: str = Depends(require_super_admin)):
+    target = email.lower()
+    if target == SUPER_ADMIN_EMAIL.lower():
+        raise HTTPException(status_code=400, detail="Nie można usunąć konta super-admina")
+    if target == current.lower():
+        raise HTTPException(status_code=400, detail="Nie możesz usunąć własnego konta")
+    result = await db.admins.delete_one({"email": target})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Administrator nie znaleziony")
+    return {"ok": True}
 
 
 # ====== ADMIN PACKAGE CRUD ======
@@ -272,6 +337,8 @@ async def admin_list_transactions(_: str = Depends(require_admin)):
             status=d.get("status", "unknown"),
             payment_status=d.get("payment_status", "unknown"),
             customer_email=d.get("customer_email"),
+            discord_name=d.get("discord_name"),
+            description=d.get("description"),
             server_name=d.get("server_name"),
             created_at=d.get("created_at", ""),
         ))
@@ -309,11 +376,13 @@ async def create_checkout(payload: CheckoutCreate, request: Request):
         "package_name": pkg_doc["name"],
         "category": pkg_doc["category"],
         "source": "nexus_landing",
+        "customer_email": str(payload.customer_email),
+        "discord_name": payload.discord_name,
     }
-    if payload.customer_email:
-        metadata["customer_email"] = str(payload.customer_email)
     if payload.server_name:
         metadata["server_name"] = payload.server_name
+    # Keep metadata short – Stripe limits metadata value to 500 chars
+    metadata["description"] = (payload.description or "")[:450]
 
     req = CheckoutSessionRequest(
         amount=amount,
@@ -340,7 +409,9 @@ async def create_checkout(payload: CheckoutCreate, request: Request):
         "status": "initiated",
         "payment_status": "pending",
         "metadata": metadata,
-        "customer_email": payload.customer_email,
+        "customer_email": str(payload.customer_email),
+        "discord_name": payload.discord_name,
+        "description": payload.description,
         "server_name": payload.server_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
