@@ -195,6 +195,32 @@ class TicketReply(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
 
 
+# ====== POSTS (Najnowsze informacje / Blog) ======
+
+class Post(BaseModel):
+    id: str
+    title: str
+    body: str
+    youtube_url: Optional[str] = None
+    published: bool = True
+    created_at: str
+    updated_at: str
+
+
+class PostCreate(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    body: str = Field(min_length=2, max_length=10000)
+    youtube_url: Optional[str] = Field(default=None, max_length=400)
+    published: bool = True
+
+
+class PostUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    body: Optional[str] = Field(default=None, min_length=2, max_length=10000)
+    youtube_url: Optional[str] = Field(default=None, max_length=400)
+    published: Optional[bool] = None
+
+
 # ====== HELPERS ======
 
 def hash_password(password: str) -> str:
@@ -949,6 +975,64 @@ async def admin_update_ticket_status(ticket_id: str, new_status: str, _: str = D
         raise HTTPException(status_code=404, detail="Ticket nie znaleziony")
     updated = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
     return _ticket_doc_to_model(updated)
+
+
+# ====== POSTS / NEWS ======
+
+def _post_doc_to_model(d: Dict) -> Post:
+    return Post(
+        id=d["id"],
+        title=d["title"],
+        body=d["body"],
+        youtube_url=d.get("youtube_url"),
+        published=bool(d.get("published", True)),
+        created_at=d.get("created_at", ""),
+        updated_at=d.get("updated_at", d.get("created_at", "")),
+    )
+
+
+@api_router.get("/posts", response_model=List[Post])
+async def list_posts(limit: int = 50, include_unpublished: bool = False):
+    query: Dict = {} if include_unpublished else {"published": True}
+    docs = await db.posts.find(query, {"_id": 0}).sort("created_at", -1).limit(max(1, min(limit, 200))).to_list(200)
+    return [_post_doc_to_model(d) for d in docs]
+
+
+@api_router.post("/admin/posts", response_model=Post)
+async def admin_create_post(payload: PostCreate, _: str = Depends(require_admin)):
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "title": payload.title,
+        "body": payload.body,
+        "youtube_url": payload.youtube_url or None,
+        "published": payload.published,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.posts.insert_one(doc)
+    return _post_doc_to_model(doc)
+
+
+@api_router.put("/admin/posts/{post_id}", response_model=Post)
+async def admin_update_post(post_id: str, payload: PostUpdate, _: str = Depends(require_admin)):
+    update = {k: v for k, v in payload.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(status_code=400, detail="Brak danych do aktualizacji")
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.posts.update_one({"id": post_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Post nie znaleziony")
+    doc = await db.posts.find_one({"id": post_id}, {"_id": 0})
+    return _post_doc_to_model(doc)
+
+
+@api_router.delete("/admin/posts/{post_id}")
+async def admin_delete_post(post_id: str, _: str = Depends(require_admin)):
+    result = await db.posts.delete_one({"id": post_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Post nie znaleziony")
+    return {"ok": True}
 
 
 # ====== ROOT ======
