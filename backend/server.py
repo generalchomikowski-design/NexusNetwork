@@ -216,6 +216,9 @@ class UserPublic(BaseModel):
     name: Optional[str] = None
     picture: Optional[str] = None
     provider: str  # "password" | "google"
+    is_admin: bool = False
+    is_super_admin: bool = False
+    admin_token: Optional[str] = None  # Set on login response if user is also an admin
 
 
 class RegisterPayload(BaseModel):
@@ -257,13 +260,17 @@ def clear_user_auth_cookies(response: Response) -> None:
         response.delete_cookie(key=n, path="/")
 
 
-def user_doc_to_public(doc: Dict) -> UserPublic:
+def user_doc_to_public(doc: Dict, admin_token: Optional[str] = None) -> UserPublic:
+    email = (doc.get("email") or "").lower()
     return UserPublic(
         user_id=doc["user_id"],
         email=doc["email"],
         name=doc.get("name"),
         picture=doc.get("picture"),
         provider=doc.get("provider", "password"),
+        is_admin=bool(doc.get("is_admin", False)) or admin_token is not None,
+        is_super_admin=email == SUPER_ADMIN_EMAIL.lower(),
+        admin_token=admin_token,
     )
 
 
@@ -337,6 +344,39 @@ async def auth_register(payload: RegisterPayload, response: Response):
 @api_router.post("/auth/login", response_model=UserPublic)
 async def auth_login(payload: LoginPayload, response: Response):
     email = payload.email.lower().strip()
+
+    # First check if these credentials match an admin account.
+    admin_doc = await db.admins.find_one({"email": email}, {"_id": 0})
+    if admin_doc and verify_password(payload.password, admin_doc["password_hash"]):
+        # Ensure a matching `users` doc exists so the customer gate also lets them in.
+        user_doc = await db.users.find_one({"email": email}, {"_id": 0})
+        if not user_doc:
+            user_id = f"user_{uuid.uuid4().hex[:14]}"
+            user_doc = {
+                "user_id": user_id,
+                "email": email,
+                "name": email.split("@")[0],
+                "picture": None,
+                "provider": "password",
+                "password_hash": hash_password(payload.password),
+                "is_admin": True,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.users.insert_one(user_doc)
+        else:
+            # Keep the user password in sync with admin password for convenience.
+            await db.users.update_one(
+                {"user_id": user_doc["user_id"]},
+                {"$set": {"password_hash": hash_password(payload.password), "is_admin": True}},
+            )
+            user_doc["is_admin"] = True
+
+        user_token = create_user_jwt(user_doc["user_id"], email)
+        set_user_auth_cookie(response, "nx_user_token", user_token, max_age=USER_JWT_TTL_DAYS * 24 * 3600)
+        admin_token = create_jwt(email)  # admin JWT (existing function)
+        return user_doc_to_public(user_doc, admin_token=admin_token)
+
+    # Fallback: regular customer login
     doc = await db.users.find_one({"email": email}, {"_id": 0})
     if not doc or not doc.get("password_hash"):
         raise HTTPException(status_code=401, detail="Niepoprawny email lub hasło")
@@ -359,7 +399,17 @@ async def auth_logout(request: Request, response: Response):
 
 @api_router.get("/auth/me", response_model=UserPublic)
 async def auth_me(user: Dict = Depends(require_user)):
-    return user_doc_to_public(user)
+    email = (user.get("email") or "").lower()
+    admin_token: Optional[str] = None
+    is_admin = bool(user.get("is_admin", False))
+    if not is_admin:
+        admin_doc = await db.admins.find_one({"email": email}, {"_id": 0})
+        if admin_doc:
+            is_admin = True
+    if is_admin:
+        admin_token = create_jwt(email)
+        user["is_admin"] = True
+    return user_doc_to_public(user, admin_token=admin_token)
 
 
 @api_router.post("/auth/google/session", response_model=UserPublic)
@@ -417,7 +467,13 @@ async def auth_google_session(payload: GoogleSessionPayload, response: Response)
         upsert=True,
     )
     set_user_auth_cookie(response, "nx_session_token", session_token, max_age=7 * 24 * 3600)
-    return user_doc_to_public(user_doc)
+    # If this Google email matches an admin, also issue an admin token
+    admin_token: Optional[str] = None
+    admin_doc = await db.admins.find_one({"email": email}, {"_id": 0})
+    if admin_doc:
+        admin_token = create_jwt(email)
+        user_doc["is_admin"] = True
+    return user_doc_to_public(user_doc, admin_token=admin_token)
 
 
 def doc_to_package(doc: Dict) -> Package:

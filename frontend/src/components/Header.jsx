@@ -105,11 +105,15 @@ export default function Header() {
             </div>
           )}
           <Link
-            to="/admin/login"
-            className="text-xs text-[#755D8D] hover:text-white transition-colors"
+            to={user?.is_admin ? "/admin" : "/admin/login"}
+            className={`text-xs transition-colors ${
+              user?.is_admin
+                ? "text-[#FF1E56] hover:text-white font-bold"
+                : "text-[#755D8D] hover:text-white"
+            }`}
             data-testid="header-admin-link"
           >
-            Panel
+            {user?.is_admin ? "Panel admina" : "Panel"}
           </Link>
         </div>
 
@@ -166,11 +170,13 @@ export default function Header() {
                 </button>
               )}
               <Link
-                to="/admin/login"
-                className="text-xs text-[#755D8D] hover:text-white text-center"
+                to={user?.is_admin ? "/admin" : "/admin/login"}
+                className={`text-xs text-center transition-colors ${
+                  user?.is_admin ? "text-[#FF1E56] font-bold" : "text-[#755D8D] hover:text-white"
+                }`}
                 data-testid="mobile-admin-link"
               >
-                Panel administracyjny
+                {user?.is_admin ? "Panel admina" : "Panel administracyjny"}
               </Link>
             </div>
           </motion.div>

@@ -16,6 +16,15 @@ export function AuthProvider({ children }) {
     try {
       const res = await api.get("/auth/me");
       setUser(res.data);
+      // Persist / refresh admin token if returned
+      if (res.data?.admin_token) {
+        localStorage.setItem("nx_admin_token", res.data.admin_token);
+        localStorage.setItem("nx_admin_email", res.data.email);
+      } else if (res.data?.is_admin === false) {
+        // Explicitly not an admin – clear stale admin token
+        localStorage.removeItem("nx_admin_token");
+        localStorage.removeItem("nx_admin_email");
+      }
     } catch {
       setUser(false);
     } finally {
@@ -27,15 +36,24 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, [checkAuth]);
 
+  const persistAdminToken = (u) => {
+    if (u?.admin_token) {
+      localStorage.setItem("nx_admin_token", u.admin_token);
+      localStorage.setItem("nx_admin_email", u.email);
+    }
+  };
+
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
     setUser(res.data);
+    persistAdminToken(res.data);
     return res.data;
   };
 
   const register = async (email, password, name) => {
     const res = await api.post("/auth/register", { email, password, name });
     setUser(res.data);
+    persistAdminToken(res.data);
     return res.data;
   };
 
@@ -45,10 +63,15 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore */
     }
+    localStorage.removeItem("nx_admin_token");
+    localStorage.removeItem("nx_admin_email");
     setUser(false);
   };
 
-  const setUserFromCallback = (u) => setUser(u);
+  const setUserFromCallback = (u) => {
+    setUser(u);
+    persistAdminToken(u);
+  };
 
   return (
     <AuthContext.Provider
