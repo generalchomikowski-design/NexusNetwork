@@ -158,6 +158,43 @@ class AdminOut(BaseModel):
     created_at: Optional[str] = None
 
 
+# ====== TICKETS ======
+
+TICKET_PRIORITIES = {"low", "medium", "high"}
+
+
+class TicketMessage(BaseModel):
+    id: str
+    author_id: str
+    author_name: str
+    author_role: str  # "user" | "admin"
+    text: str
+    created_at: str
+
+
+class Ticket(BaseModel):
+    id: str
+    user_id: str
+    user_email: str
+    user_name: Optional[str] = None
+    subject: str
+    priority: str
+    status: str  # "open" | "closed"
+    messages: List[TicketMessage]
+    created_at: str
+    updated_at: str
+
+
+class TicketCreate(BaseModel):
+    subject: str = Field(min_length=2, max_length=200)
+    message: str = Field(min_length=2, max_length=4000)
+    priority: str = Field(default="medium")
+
+
+class TicketReply(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
 # ====== HELPERS ======
 
 def hash_password(password: str) -> str:
@@ -787,6 +824,133 @@ async def submit_contact(payload: ContactCreate):
     return {"ok": True, "id": doc["id"]}
 
 
+# ====== TICKETS ======
+
+def _normalize_priority(p: Optional[str]) -> str:
+    p = (p or "medium").lower()
+    return p if p in TICKET_PRIORITIES else "medium"
+
+
+def _ticket_doc_to_model(doc: Dict) -> Ticket:
+    msgs = [TicketMessage(**m) for m in (doc.get("messages") or [])]
+    return Ticket(
+        id=doc["id"],
+        user_id=doc["user_id"],
+        user_email=doc["user_email"],
+        user_name=doc.get("user_name"),
+        subject=doc["subject"],
+        priority=doc.get("priority", "medium"),
+        status=doc.get("status", "open"),
+        messages=msgs,
+        created_at=doc["created_at"],
+        updated_at=doc.get("updated_at", doc["created_at"]),
+    )
+
+
+@api_router.post("/tickets", response_model=Ticket)
+async def create_ticket(payload: TicketCreate, user: Dict = Depends(require_user)):
+    now = datetime.now(timezone.utc).isoformat()
+    first_msg = {
+        "id": str(uuid.uuid4()),
+        "author_id": user["user_id"],
+        "author_name": user.get("name") or user["email"],
+        "author_role": "user",
+        "text": payload.message,
+        "created_at": now,
+    }
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["user_id"],
+        "user_email": user["email"],
+        "user_name": user.get("name"),
+        "subject": payload.subject,
+        "priority": _normalize_priority(payload.priority),
+        "status": "open",
+        "messages": [first_msg],
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.tickets.insert_one(doc)
+    return _ticket_doc_to_model(doc)
+
+
+@api_router.get("/tickets/mine", response_model=List[Ticket])
+async def my_tickets(user: Dict = Depends(require_user)):
+    docs = await db.tickets.find({"user_id": user["user_id"]}, {"_id": 0}).sort("updated_at", -1).to_list(200)
+    return [_ticket_doc_to_model(d) for d in docs]
+
+
+@api_router.get("/tickets/{ticket_id}", response_model=Ticket)
+async def get_ticket(ticket_id: str, user: Dict = Depends(require_user)):
+    doc = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Ticket nie znaleziony")
+    # Owner OR admin can read
+    is_owner = doc["user_id"] == user["user_id"]
+    is_admin = bool(user.get("is_admin")) or bool(
+        await db.admins.find_one({"email": user["email"]}, {"_id": 0})
+    )
+    if not (is_owner or is_admin):
+        raise HTTPException(status_code=403, detail="Brak dostępu do tego ticketu")
+    return _ticket_doc_to_model(doc)
+
+
+@api_router.post("/tickets/{ticket_id}/reply", response_model=Ticket)
+async def reply_ticket(ticket_id: str, payload: TicketReply, user: Dict = Depends(require_user)):
+    doc = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Ticket nie znaleziony")
+    if doc.get("status") == "closed":
+        raise HTTPException(status_code=400, detail="Ticket został zamknięty")
+    is_owner = doc["user_id"] == user["user_id"]
+    is_admin_user = bool(user.get("is_admin")) or bool(
+        await db.admins.find_one({"email": user["email"]}, {"_id": 0})
+    )
+    if not (is_owner or is_admin_user):
+        raise HTTPException(status_code=403, detail="Brak dostępu do tego ticketu")
+    now = datetime.now(timezone.utc).isoformat()
+    msg = {
+        "id": str(uuid.uuid4()),
+        "author_id": user["user_id"],
+        "author_name": user.get("name") or user["email"],
+        "author_role": "admin" if (is_admin_user and not is_owner) else ("admin" if is_admin_user else "user"),
+        "text": payload.text,
+        "created_at": now,
+    }
+    # If admin is also owner of the ticket, still mark as admin reply for clarity if they're acting as admin
+    if is_admin_user and is_owner:
+        # User who is admin: keep their original role as 'user' on tickets they opened themselves
+        msg["author_role"] = "user"
+    await db.tickets.update_one(
+        {"id": ticket_id},
+        {"$push": {"messages": msg}, "$set": {"updated_at": now}},
+    )
+    updated = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
+    return _ticket_doc_to_model(updated)
+
+
+# ----- Admin ticket endpoints -----
+
+@api_router.get("/admin/tickets", response_model=List[Ticket])
+async def admin_list_tickets(_: str = Depends(require_admin)):
+    docs = await db.tickets.find({}, {"_id": 0}).sort("updated_at", -1).to_list(500)
+    return [_ticket_doc_to_model(d) for d in docs]
+
+
+@api_router.put("/admin/tickets/{ticket_id}/status", response_model=Ticket)
+async def admin_update_ticket_status(ticket_id: str, new_status: str, _: str = Depends(require_admin)):
+    if new_status not in {"open", "closed"}:
+        raise HTTPException(status_code=400, detail="Niepoprawny status")
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.tickets.update_one(
+        {"id": ticket_id}, {"$set": {"status": new_status, "updated_at": now}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Ticket nie znaleziony")
+    updated = await db.tickets.find_one({"id": ticket_id}, {"_id": 0})
+    return _ticket_doc_to_model(updated)
+
+
 # ====== ROOT ======
 
 @api_router.get("/")
@@ -870,6 +1034,8 @@ async def seed_data():
         await db.users.create_index("user_id", unique=True)
         await db.user_sessions.create_index("session_token", unique=True)
         await db.user_sessions.create_index("user_id")
+        await db.tickets.create_index([("user_id", 1), ("updated_at", -1)])
+        await db.tickets.create_index("updated_at")
     except Exception as e:
         logging.warning(f"Index creation: {e}")
 

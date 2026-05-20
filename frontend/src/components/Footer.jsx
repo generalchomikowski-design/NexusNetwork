@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Hexagon, Github, MessageSquare, Twitter, Youtube } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navLinks = [
   { id: "hosting", label: "Hosting" },
@@ -18,6 +19,7 @@ const legal = [
 ];
 
 export default function Footer() {
+  const { user } = useAuth();
   const scrollTo = (id) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -102,22 +104,24 @@ export default function Footer() {
             </ul>
           </div>
 
-          <div className="md:col-span-2">
-            <p className="text-xs uppercase tracking-[0.2em] font-bold text-[#FF1E56] mb-4">
-              Konto
-            </p>
-            <ul className="space-y-2.5">
-              <li>
-                <Link
-                  to="/admin/login"
-                  className="text-sm text-[#A68CC2] hover:text-white transition-colors"
-                  data-testid="footer-admin-link"
-                >
-                  Panel admina
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {user?.is_admin && (
+            <div className="md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.2em] font-bold text-[#FF1E56] mb-4">
+                Konto
+              </p>
+              <ul className="space-y-2.5">
+                <li>
+                  <Link
+                    to="/admin"
+                    className="text-sm text-[#A68CC2] hover:text-white transition-colors"
+                    data-testid="footer-admin-link"
+                  >
+                    Panel admina
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="nx-divider mb-6" />

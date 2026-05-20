@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw, ShieldCheck, UserPlus, Crown, Mail } from "lucide-react";
+import { Hexagon, LogOut, Plus, Edit, Trash2, Loader2, Save, X, RefreshCcw, ShieldCheck, UserPlus, Crown, Ticket as TicketIcon, Reply, Lock, Unlock, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   const [packages, setPackages] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [admins, setAdmins] = useState([]);
-  const [contacts, setContacts] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [me, setMe] = useState({ email: "", is_super: false });
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null); // package or null
@@ -90,13 +90,13 @@ export default function AdminDashboard() {
       const calls = [
         api.get("/packages?active_only=false"),
         api.get("/admin/transactions"),
-        api.get("/admin/contacts"),
+        api.get("/admin/tickets"),
       ];
       if (isSuper) calls.push(api.get("/admin/admins"));
       const results = await Promise.all(calls);
       setPackages(results[0].data || []);
       setTransactions(results[1].data || []);
-      setContacts(results[2].data || []);
+      setTickets(results[2].data || []);
       if (isSuper && results[3]) setAdmins(results[3].data || []);
     } catch (e) {
       toast.error("Błąd ładowania danych");
@@ -137,6 +137,29 @@ export default function AdminDashboard() {
       setAdmins(res.data || []);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Błąd usuwania");
+    }
+  };
+
+  const replyToTicket = async (ticketId, text) => {
+    try {
+      const res = await api.post(`/tickets/${ticketId}/reply`, { text });
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? res.data : t)));
+      toast.success("Odpowiedź wysłana");
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Błąd wysyłania");
+      return false;
+    }
+  };
+
+  const toggleTicketStatus = async (ticket) => {
+    const next = ticket.status === "closed" ? "open" : "closed";
+    try {
+      const res = await api.put(`/admin/tickets/${ticket.id}/status?new_status=${next}`);
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? res.data : t)));
+      toast.success(next === "closed" ? "Ticket zamknięty" : "Ticket otwarty");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Błąd");
     }
   };
 
@@ -287,12 +310,12 @@ export default function AdminDashboard() {
               Transakcje ({transactions.length})
             </TabsTrigger>
             <TabsTrigger
-              value="messages"
+              value="tickets"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF1E56] data-[state=active]:to-[#B026FF]"
-              data-testid="admin-tab-messages"
+              data-testid="admin-tab-tickets"
             >
-              <Mail className="w-3.5 h-3.5 mr-1" />
-              Wiadomości ({contacts.length})
+              <TicketIcon className="w-3.5 h-3.5 mr-1" />
+              Tickets ({tickets.length})
             </TabsTrigger>
             {me.is_super && (
               <TabsTrigger
@@ -423,7 +446,7 @@ export default function AdminDashboard() {
                       <TableHead className="text-[#A68CC2]">Discord</TableHead>
                       <TableHead className="text-[#A68CC2]">Opis</TableHead>
                       <TableHead className="text-[#A68CC2]">Kwota</TableHead>
-                      <TableHead className="text-[#A68CC2]">Płatność</TableHead>
+                      <TableHead className="text-[#A68CC2]">Status płatności</TableHead>
                       <TableHead className="text-[#A68CC2]">Data</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -450,15 +473,7 @@ export default function AdminDashboard() {
                           {formatPLN(t.amount)}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`text-xs font-bold ${
-                              t.payment_status === "paid"
-                                ? "text-[#00FF7F]"
-                                : "text-[#A68CC2]"
-                            }`}
-                          >
-                            {t.payment_status}
-                          </span>
+                          <PaymentBadge txn={t} />
                         </TableCell>
                         <TableCell className="text-[#755D8D] text-xs">
                           {t.created_at?.slice(0, 19).replace("T", " ")}
@@ -471,54 +486,23 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
 
-          <TabsContent value="messages">
+          <TabsContent value="tickets">
             <div className="nx-card rounded-xl overflow-hidden">
               {loading ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="w-8 h-8 text-[#FF1E56] animate-spin" />
                 </div>
-              ) : contacts.length === 0 ? (
-                <p className="text-center py-12 text-[#A68CC2]">
-                  Brak wiadomości z formularza kontaktowego.
-                </p>
+              ) : tickets.length === 0 ? (
+                <p className="text-center py-12 text-[#A68CC2]">Brak ticketów.</p>
               ) : (
                 <ul className="divide-y divide-[#B026FF]/15">
-                  {contacts.map((c) => (
-                    <li
-                      key={c.id}
-                      className="p-5 hover:bg-[#B026FF]/5 transition-colors"
-                      data-testid={`admin-message-${c.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-4 mb-2 flex-wrap">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="inline-flex w-9 h-9 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
-                            <Mail className="w-4 h-4 text-[#FF1E56]" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="font-display font-bold text-white truncate">
-                              {c.name}
-                            </p>
-                            <a
-                              href={`mailto:${c.email}`}
-                              className="text-xs text-[#A68CC2] hover:text-white"
-                            >
-                              {c.email}
-                            </a>
-                          </div>
-                        </div>
-                        <span className="text-xs text-[#755D8D] whitespace-nowrap">
-                          {c.created_at?.slice(0, 19).replace("T", " ")}
-                        </span>
-                      </div>
-                      {c.subject && (
-                        <p className="text-sm font-semibold text-[#C9B9DD] mb-1.5 ml-12">
-                          Temat: {c.subject}
-                        </p>
-                      )}
-                      <p className="text-sm text-[#A68CC2] leading-relaxed whitespace-pre-wrap ml-12">
-                        {c.message}
-                      </p>
-                    </li>
+                  {tickets.map((t) => (
+                    <AdminTicketRow
+                      key={t.id}
+                      ticket={t}
+                      onReply={replyToTicket}
+                      onToggleStatus={toggleTicketStatus}
+                    />
                   ))}
                 </ul>
               )}
@@ -785,5 +769,162 @@ export default function AdminDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const PRIORITY_BADGE = {
+  low: { label: "Niski", cls: "text-[#A68CC2] border-[#A68CC2]/30 bg-[#A68CC2]/10" },
+  medium: { label: "Średni", cls: "text-[#FFB020] border-[#FFB020]/30 bg-[#FFB020]/10" },
+  high: { label: "Wysoki", cls: "text-[#FF1E56] border-[#FF1E56]/40 bg-[#FF1E56]/10" },
+};
+
+function PaymentBadge({ txn }) {
+  const ps = txn.payment_status;
+  const st = txn.status;
+  const ageMin = txn.created_at
+    ? (Date.now() - new Date(txn.created_at).getTime()) / 60000
+    : 0;
+  const isPaid = ps === "paid";
+  const isExpired = st === "expired" || ps === "expired";
+  // Heuristic: not paid AND older than 30 min → treat as cancelled/abandoned
+  const isAbandoned = !isPaid && (isExpired || ageMin > 30);
+
+  let cls = "text-[#A68CC2] border-[#A68CC2]/30 bg-[#A68CC2]/10";
+  let label = "W trakcie";
+  let Icon = Clock;
+  if (isPaid) {
+    cls = "text-[#00FF7F] border-[#00FF7F]/40 bg-[#00FF7F]/10";
+    label = "Opłacono";
+    Icon = CheckCircle2;
+  } else if (isAbandoned) {
+    cls = "text-[#FF1E56] border-[#FF1E56]/40 bg-[#FF1E56]/10";
+    label = "Anulowano";
+    Icon = XCircle;
+  }
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${cls}`}>
+      <Icon className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
+
+function AdminTicketRow({ ticket, onReply, onToggleStatus }) {
+  const [open, setOpen] = useState(false);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const priority = PRIORITY_BADGE[ticket.priority] || PRIORITY_BADGE.medium;
+  const isClosed = ticket.status === "closed";
+
+  const send = async () => {
+    if (!reply.trim()) return;
+    setSending(true);
+    const ok = await onReply(ticket.id, reply.trim());
+    if (ok) setReply("");
+    setSending(false);
+  };
+
+  return (
+    <li className="p-5 hover:bg-[#B026FF]/5 transition-colors" data-testid={`admin-ticket-${ticket.id}`}>
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex w-9 h-9 rounded-md bg-gradient-to-br from-[#FF1E56]/20 to-[#B026FF]/20 border border-[#B026FF]/40 items-center justify-center flex-shrink-0">
+            <TicketIcon className="w-4 h-4 text-[#FF1E56]" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-display font-bold text-white truncate">{ticket.subject}</p>
+            <p className="text-xs text-[#A68CC2]">
+              {ticket.user_name || ticket.user_email} · {ticket.user_email}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-sm border ${priority.cls}`}>
+            {priority.label}
+          </span>
+          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-sm border ${
+            isClosed ? "text-[#755D8D] border-[#755D8D]/40 bg-[#755D8D]/10" : "text-[#00FF7F] border-[#00FF7F]/40 bg-[#00FF7F]/10"
+          }`}>
+            {isClosed ? "Zamknięty" : "Otwarty"}
+          </span>
+          <span className="text-xs text-[#755D8D] whitespace-nowrap">
+            {ticket.updated_at?.slice(0, 16).replace("T", " ")}
+          </span>
+          <button
+            onClick={() => setOpen(!open)}
+            className="nx-btn-outline px-3 py-1 rounded-md text-xs"
+            data-testid={`admin-ticket-toggle-${ticket.id}`}
+          >
+            {open ? "Zwiń" : "Otwórz"}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="ml-12 mt-3 space-y-3">
+          {ticket.messages.map((m) => (
+            <div
+              key={m.id}
+              className={`p-3 rounded-md ${
+                m.author_role === "admin"
+                  ? "bg-[#FF1E56]/10 border border-[#FF1E56]/30"
+                  : "bg-[#150029]/60 border border-[#B026FF]/20"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
+                <span className={`text-xs font-bold ${m.author_role === "admin" ? "text-[#FF1E56]" : "text-[#B026FF]"}`}>
+                  {m.author_role === "admin" ? "Admin" : "Klient"} · {m.author_name}
+                </span>
+                <span className="text-[10px] text-[#755D8D]">
+                  {m.created_at?.slice(0, 16).replace("T", " ")}
+                </span>
+              </div>
+              <p className="text-sm text-[#C9B9DD] whitespace-pre-wrap leading-relaxed">{m.text}</p>
+            </div>
+          ))}
+
+          {!isClosed && (
+            <div className="pt-2 space-y-2">
+              <Textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Odpowiedz klientowi..."
+                className="bg-[#0A0014] border-[#B026FF]/30 text-white min-h-[90px]"
+                data-testid={`admin-ticket-reply-input-${ticket.id}`}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={send}
+                  disabled={sending || !reply.trim()}
+                  className="nx-btn-primary px-4 py-2 rounded-md text-sm inline-flex items-center gap-2 disabled:opacity-60"
+                  data-testid={`admin-ticket-reply-submit-${ticket.id}`}
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Reply className="w-4 h-4" />}
+                  Wyślij odpowiedź
+                </button>
+                <button
+                  onClick={() => onToggleStatus(ticket)}
+                  className="nx-btn-outline px-4 py-2 rounded-md text-sm inline-flex items-center gap-2"
+                  data-testid={`admin-ticket-close-${ticket.id}`}
+                >
+                  <Lock className="w-4 h-4" />
+                  Zamknij ticket
+                </button>
+              </div>
+            </div>
+          )}
+          {isClosed && (
+            <button
+              onClick={() => onToggleStatus(ticket)}
+              className="nx-btn-outline px-4 py-2 rounded-md text-sm inline-flex items-center gap-2"
+              data-testid={`admin-ticket-reopen-${ticket.id}`}
+            >
+              <Unlock className="w-4 h-4" />
+              Otwórz ponownie
+            </button>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
